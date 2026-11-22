@@ -1,0 +1,2 @@
+# Backup files hold the shop's car and cleaning records: keep them out of git
+*.json
