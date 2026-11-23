@@ -474,7 +474,6 @@
   .toolbar { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; justify-content: space-between; }
   .cars { display: grid; gap: .7rem; }
   .car { gap: .6rem; min-width: 0; }
-  .car.sold { opacity: .7; }
   .cartop { display: flex; justify-content: space-between; gap: .8rem; align-items: flex-start; }
   .carhead { display: flex; gap: .8rem; align-items: flex-start; min-width: 0; }
   .carname { min-width: 0; }
@@ -493,9 +492,6 @@
   .swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid #0006; display: inline-block; flex: none; }
   .added { text-align: right; font-size: .82rem; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .added b { display: block; font-size: 1rem; color: var(--strong); }
-  .pill { display: inline-block; margin-top: .3rem; padding: .05rem .5rem; border-radius: 3px; font-size: .72rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
-  .pill.forsale { background: #2e9e3e; color: #fff; } .pill.pending { background: #f2b705; color: #000; }
-  .pill.sold { background: #7a7a7a; color: #fff; } .pill.notlisted { color: inherit; box-shadow: inset 0 0 0 1px currentColor; opacity: .85; }
   .tag { display: inline-block; margin-left: .4rem; padding: 0 .4rem; border-radius: 3px; font-size: .75rem; font-weight: 700; vertical-align: 1px; white-space: nowrap; }
   .tag.prog { background: #f2b705; color: #000; } .tag.done { background: #2e9e3e; color: #fff; } .tag.due { background: #d9322b; color: #fff; }
   .carnotes { color: var(--muted); font-size: .9rem; overflow-wrap: anywhere; }
@@ -576,7 +572,7 @@
         <span><b>14 days</b> A completed car comes back to To clean 14 days later.</span></div>
       <div><h4>Cars</h4>
         <span><b>Add car</b> New cars start as Not listed, dated today. Change the date if it came in earlier.</span>
-        <span><b>Edit</b> Change details or status. Sold cars never show on To clean.</span>
+        <span><b>Edit</b> Change a car's details, photos or notes, or delete it.</span>
         <span><b>History</b> Every cleaning of one car.</span>
         <span><b>Backup</b> The list lives in this browser only. Save a backup file now and then so you don't lose it.</span></div>
     </div>
@@ -649,7 +645,6 @@ for (const [k, name] of Object.entries(ICON_FOR)) {
 
 /* ---------- saved data: one record in this browser ---------- */
 const KEY = "lotbookData";
-const STATUS = { notlisted: "Not listed", forsale: "For sale", pending: "Pending", sold: "Sold" };
 const DUE_DAYS = 14;
 let DATA = { cars: [], cleanings: [], savedAt: "" }, canSave = true;
 try { const s = localStorage.getItem(KEY); if (s) { const d = JSON.parse(s); if (Array.isArray(d.cars) && Array.isArray(d.cleanings)) DATA = d; } } catch (e) { canSave = false; }
@@ -684,7 +679,7 @@ const isComplete = x => x.complete !== false;
 const lastClean = id => (cleansFor(id)[0] || {}).date || null;
 const lastComplete = id => (cleansFor(id).find(isComplete) || {}).date || null;
 const inProgress = id => { const lc = lastComplete(id); return cleansFor(id).some(x => !isComplete(x) && (!lc || x.date > lc)); };
-const needsClean = c => c.status !== "sold" && (!lastComplete(c.id) || daysAgo(lastComplete(c.id)) > DUE_DAYS);
+const needsClean = c => (!lastComplete(c.id) || daysAgo(lastComplete(c.id)) > DUE_DAYS);
 const findCar = id => DATA.cars.find(c => c.id === id);
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => t.hidden = true, 2600); }
 
@@ -701,10 +696,10 @@ TABS.forEach(b => b.onclick = () => showTab(b.dataset.tab));
 
 /* ---------- drawing the page ---------- */
 function render() {
-  const due = DATA.cars.filter(needsClean).length, n = s => DATA.cars.filter(c => c.status === s).length;
-  $("summary").innerHTML = `<span><b>${DATA.cars.length}</b> cars</span><span><b>${n("notlisted")}</b> not listed</span><span><b>${n("forsale")}</b> for sale</span><span><b>${n("pending")}</b> pending</span><span><b>${n("sold")}</b> sold</span>`;
+  const due = DATA.cars.filter(needsClean).length;
+  $("summary").innerHTML = `<span><b>${DATA.cars.length}</b> cars</span><span><b>${due}</b> to clean</span>`;
   setTabLabel("todo", `To clean (${due})`); setTabLabel("done", `Done (${DATA.cars.length - due})`);
-  $("carsHint").textContent = tab === "todo" ? `Cars not marked complete yet, or completed over ${DUE_DAYS} days ago.` : `Marked complete in the last ${DUE_DAYS} days, plus sold cars.`;
+  $("carsHint").textContent = tab === "todo" ? `Cars not marked complete yet, or completed over ${DUE_DAYS} days ago.` : `Marked complete in the last ${DUE_DAYS} days.`;
   renderCars(); renderLog(); renderBackup();
 }
 function setTabLabel(id, text) { const b = document.querySelector(`.tab[data-tab="${id}"]`); const ic = b.querySelector(".ic"); b.textContent = text; if (ic) b.prepend(ic); }
@@ -712,10 +707,9 @@ function setTabLabel(id, text) { const b = document.querySelector(`.tab[data-tab
 function renderCars() {
   const box = $("cars");
   if (!DATA.cars.length) { box.innerHTML = `<div class="empty">No cars yet. Tap <b>Add car</b> to put the first one on the list, or open a backup file on the Backup tab.</div>`; return; }
-  const order = { notlisted: 0, forsale: 1, pending: 2, sold: 3 };
   const list = tab === "todo"
     ? DATA.cars.filter(needsClean).sort((a, b) => (lastClean(a.id) || "").localeCompare(lastClean(b.id) || "") || (String(a.added) + (a.addedTime || "")).localeCompare(String(b.added) + (b.addedTime || "")))
-    : DATA.cars.filter(c => !needsClean(c)).sort((a, b) => (order[a.status] ?? 0) - (order[b.status] ?? 0) || (lastClean(b.id) || "").localeCompare(lastClean(a.id) || ""));
+    : DATA.cars.filter(c => !needsClean(c)).sort((a, b) => (lastClean(b.id) || "").localeCompare(lastClean(a.id) || ""));
   if (!list.length) { box.innerHTML = `<div class="empty">${tab === "todo" ? "All caught up. Every car is marked complete." : `No cars marked complete in the last ${DUE_DAYS} days yet.`}</div>`; return; }
   box.innerHTML = list.map(c => {
     const l = lastClean(c.id), due = needsClean(c), prog = inProgress(c.id), lx = cleansFor(c.id)[0];
@@ -726,10 +720,9 @@ function renderCars() {
     const all = cleansFor(c.id);
     if (all.length) when += `<span class="cleanlist">${all.map(x => `<span class="cl"><b>${whenText(x)}</b>${isComplete(x) ? '<span class="tag done">✓</span>' : ""}<span class="clw">${x.work ? `<em>${esc(x.work)}</em>` : ""}${x.work && x.notes ? " · " : ""}${esc(x.notes) || (x.work ? "" : "Cleaned")}</span></span>`).join("")}</span>`;
     const sub = [c.color ? swatch(c.color) + esc(c.color) : "", esc(miles(c.mileage))].filter(Boolean).join(" · ");
-    const st = STATUS[c.status] ? c.status : "notlisted";
-    return `<article class="card car ${st === "sold" ? "sold" : ""}">
+    return `<article class="card car">
       <div class="cartop"><div class="carhead">${carPhotos(c).length ? `<button type="button" class="thumbbtn" data-act="photo" data-id="${c.id}" title="Show the photos bigger"><img class="thumb" src="${esc(carPhotos(c)[0])}" alt="Photo of ${esc(carName(c))}">${carPhotos(c).length > 1 ? `<span class="more">+${carPhotos(c).length - 1}</span>` : ""}</button>` : ""}<div class="carname"><h3>${esc(carName(c))}</h3><div class="sub hint">${sub}</div></div></div>
-        <div class="added">${c.added ? `Added<b>${shortDate(c.added)}</b>${c.addedTime ? niceTime(c.addedTime) + " · " : ""}${agoText(daysAgo(c.added))}<br>` : ""}<span class="pill ${st}">${STATUS[st]}</span></div></div>
+        <div class="added">${c.added ? `Added<b>${shortDate(c.added)}</b>${c.addedTime ? niceTime(c.addedTime) + " · " : ""}${agoText(daysAgo(c.added))}` : ""}</div></div>
       ${c.notes ? `<div class="carnotes">${esc(c.notes)}</div>` : ""}
       <div class="clean"><span class="when ${due && !prog && l ? "due" : ""}">${when}</span>
         <span class="acts"><button type="button" data-act="hist" data-id="${c.id}">History (${cleansFor(c.id).length})</button><button type="button" data-act="clean" data-id="${c.id}">${iconHtml("pencil")}Log cleaning</button><button type="button" data-act="edit" data-id="${c.id}">Edit</button></span></div>
@@ -768,7 +761,7 @@ const askDelete = (where, text, onYes) => {
 };
 
 function carForm(c) {
-  const isNew = !c; c = c || { status: "notlisted", added: todayStr(), addedTime: nowTime() };
+  const isNew = !c; c = c || { added: todayStr(), addedTime: nowTime() };
   openDlg(isNew ? "Add a car" : "Edit car", `
     <label>Year<input type="text" id="cYear" inputmode="numeric" maxlength="4" value="${esc(c.year)}" placeholder="2016"></label>
     <label>Make<input type="text" id="cMake" value="${esc(c.make)}" placeholder="Toyota"></label>
@@ -778,7 +771,6 @@ function carForm(c) {
     <label>Date added<input type="date" id="cAdded" value="${esc(c.added || todayStr())}" max="${todayStr()}"></label>
     <label>Time added<input type="time" id="cTime" value="${esc(c.addedTime || "")}"></label>
     <div class="frow"><b>Photos</b><span class="phrow"><span class="phrow" id="cPhPrev"></span><button type="button" id="cPhPick">${iconHtml("open")}Add photos</button><input type="file" id="cPhFile" accept="image/*" multiple hidden></span></div>
-    <label>Status<select id="cStatus">${Object.entries(STATUS).map(([k, l]) => `<option value="${k}" ${c.status === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
     <label>Notes<textarea id="notes" placeholder="Small dent on rear bumper">${esc(c.notes)}</textarea></label>
     <div id="cMsg"></div>
     <div class="dlgbar">${isNew ? "" : `<button type="button" id="cDel">${iconHtml("del")}Delete car</button>`}<span class="r"><button type="button" id="cCancel">Cancel</button><button type="button" id="cSave">${iconHtml("save")}${isNew ? "Add car" : "Save changes"}</button></span></div>`, () => {
@@ -798,13 +790,13 @@ function carForm(c) {
       if (!make && !model) { $("cMsg").innerHTML = `<div class="warn">Type at least the make or the model.</div>`; return; }
       const digits = v => { v = String(v).replace(/[^0-9]/g, ""); return v === "" ? "" : Number(v); };
       const body = { year: $("cYear").value.trim(), make, model, color: $("cColor").value.trim(), mileage: digits($("cMiles").value),
-        added: $("cAdded").value || todayStr(), addedTime: $("cTime").value, status: $("cStatus").value, notes: $("notes").value.trim(), photos, updated: new Date().toISOString() };
+        added: $("cAdded").value || todayStr(), addedTime: $("cTime").value, notes: $("notes").value.trim(), photos, updated: new Date().toISOString() };
       if (isNew) DATA.cars.push({ id: newId(), ...body }); else { const car = findCar(c.id); Object.assign(car, body); delete car.photo; }
       closeDlg(); store(); toast(isNew ? "Car added" : "Car saved");
     };
     if (!isNew) $("cDel").onclick = () => {
       const n = cleansFor(c.id).length;
-      askDelete("cMsg", `Delete ${esc(carName(c))}${n ? ` and its ${n} cleaning record${n === 1 ? "" : "s"}` : ""}? This can't be undone. To keep the record, set the status to Sold instead.`, () => {
+      askDelete("cMsg", `Delete ${esc(carName(c))}${n ? ` and its ${n} cleaning record${n === 1 ? "" : "s"}` : ""}? This can't be undone.`, () => {
         DATA.cars = DATA.cars.filter(x => x.id !== c.id); DATA.cleanings = DATA.cleanings.filter(x => x.carId !== c.id);
         closeDlg(); store(); toast("Car deleted");
       });
@@ -814,8 +806,8 @@ function carForm(c) {
 
 function cleanForm(x, carId) {
   const isNew = !x; x = x || { date: todayStr(), time: nowTime(), carId: carId || "" };
-  const order = (a, b) => (a.status === "sold") - (b.status === "sold") || carName(a).localeCompare(carName(b));
-  const opts = DATA.cars.slice().sort(order).map(c => `<option value="${c.id}" ${x.carId === c.id ? "selected" : ""}>${esc(carName(c))}${c.color ? " (" + esc(c.color) + ")" : ""}${c.status === "sold" ? " — sold" : ""}</option>`).join("");
+  const order = (a, b) => carName(a).localeCompare(carName(b));
+  const opts = DATA.cars.slice().sort(order).map(c => `<option value="${c.id}" ${x.carId === c.id ? "selected" : ""}>${esc(carName(c))}${c.color ? " (" + esc(c.color) + ")" : ""}</option>`).join("");
   const QUICK = ["Wash", "Interior", "Full detail", "Vacuum", "Windows", "Tires & wheels", "Engine bay"];
   openDlg(isNew ? "Log a cleaning" : "Edit cleaning", `
     <label>Which car<select id="lCar"><option value="">Choose a car…</option>${opts}</select></label>
@@ -873,7 +865,7 @@ document.addEventListener("keydown", e => { const b = e.key === "ArrowRight" ? $
 
 function historyBox(c) {
   const l = cleansFor(c.id);
-  openDlg(carName(c), `<p class="hint">${[c.color, miles(c.mileage), c.added ? "Added " + shortDate(c.added) + (c.addedTime ? " at " + niceTime(c.addedTime) : "") : "", STATUS[c.status]].filter(Boolean).map(esc).join(" · ")}</p>
+  openDlg(carName(c), `<p class="hint">${[c.color, miles(c.mileage), c.added ? "Added " + shortDate(c.added) + (c.addedTime ? " at " + niceTime(c.addedTime) : "") : ""].filter(Boolean).map(esc).join(" · ")}</p>
     ${l.length ? `<div class="hist">${l.map(x => `<div><b>${whenText(x)}${isComplete(x) ? ' <span class="tag done">✓</span>' : ""}</b><span>${esc([x.work, x.notes].filter(Boolean).join(" — ") || "Cleaned")}</span></div>`).join("")}</div>` : `<p class="hint">Not cleaned yet.</p>`}
     <div class="dlgbar"><span class="r"><button type="button" id="hClose">Close</button><button type="button" id="hLog">${iconHtml("pencil")}Log cleaning</button></span></div>`, () => {
     $("hClose").onclick = closeDlg; $("hLog").onclick = () => cleanForm(null, c.id);
