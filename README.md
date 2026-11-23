@@ -1,6 +1,6 @@
 # Cleaning Log
 
-A one-page car cleaning tracker for LFOD Motorsports. Open `index.html` in a browser.
+A one-page car cleaning tracker for cars
 
 - **To clean / Done / History** tabs, cars with photos, cleanings with date, time and notes.
 - Everything is saved in the browser on that device. Nothing is sent anywhere.
