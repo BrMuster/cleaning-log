@@ -544,7 +544,7 @@
     <div class="hint" id="gateMsg"></div>
     <form id="signForm" class="gform" hidden>
       <label>Email<input type="email" id="sEmail" autocomplete="username" required></label>
-      <label>Password<input type="password" id="sPass" autocomplete="current-password" required></label>
+      <label>Password<span class="unit"><input type="password" id="sPass" autocomplete="current-password" required><button type="button" id="sShow" aria-pressed="false" aria-controls="sPass">Show</button></span></label>
       <div class="bar"><button type="submit" id="sGo">Sign in</button><button type="button" id="sForgot">Forgot password?</button></div>
     </form>
   </section>
@@ -1062,10 +1062,14 @@ const authMsg = e => ({
 $("signForm").addEventListener("submit", async e => {
   e.preventDefault(); if (!CLOUD) return;
   $("sGo").disabled = true; $("gateMsg").textContent = "Signing in…";
-  try { await CLOUD.U.signInWithEmailAndPassword(CLOUD.auth, $("sEmail").value.trim(), $("sPass").value); $("sPass").value = ""; }
+  try { await CLOUD.U.signInWithEmailAndPassword(CLOUD.auth, $("sEmail").value.trim(), $("sPass").value); $("sPass").value = ""; $("sPass").type = "password"; $("sShow").textContent = "Show"; $("sShow").setAttribute("aria-pressed", false); }
   catch (err) { $("gateMsg").innerHTML = `<div class="warn">${esc(authMsg(err))}</div>`; }
   $("sGo").disabled = false;
 });
+$("sShow").onclick = () => {   // show or hide the typed password
+  const p = $("sPass"), show = p.type === "password";
+  p.type = show ? "text" : "password"; $("sShow").textContent = show ? "Hide" : "Show"; $("sShow").setAttribute("aria-pressed", show); p.focus();
+};
 $("sForgot").onclick = async () => {
   const email = $("sEmail").value.trim();
   if (!email) { $("gateMsg").innerHTML = `<div class="warn">Type your email above first, then tap Forgot password.</div>`; return; }
