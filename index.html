@@ -478,12 +478,19 @@
   .carhead { display: flex; gap: .8rem; align-items: flex-start; min-width: 0; }
   .carname { min-width: 0; }
   button.thumbbtn { flex: none; padding: 0; border: 0; background: none; box-shadow: none; line-height: 0; cursor: zoom-in; }
-  .thumb { width: 88px; height: 66px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); display: block; }
-  @media (max-width: 520px) { .thumb { width: 64px; height: 48px; } }
-  .bigphoto { width: 100%; max-height: 70vh; object-fit: contain; border-radius: 4px; }
+  .thumb { width: 264px; height: 198px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); display: block; }
+  @media (max-width: 620px) { .carhead { flex-direction: column; width: 100%; } .carhead .thumbbtn, .thumb { width: 100%; max-width: 264px; } .thumb { height: auto; aspect-ratio: 4 / 3; } }
+  .bigphoto { width: 100%; max-height: 76vh; object-fit: contain; border-radius: 4px; }
+  .rptdlg:has(.bigphoto) { width: 60rem; max-width: 96vw; }   /* the photo viewer is twice as wide as the other boxes */
   .rptdlg .frow { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: .5rem; align-items: center; }
-  .phrow { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .phrow img { width: 88px; height: 66px; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); display: block; }
-  .phitem { position: relative; } .phitem button { position: absolute; top: -.45rem; right: -.45rem; width: 1.5rem; height: 1.5rem; padding: 0; border-radius: 50%; line-height: 1; font-weight: 700; background: #d9322b; color: #fff; border: 1px solid #8a1410; box-shadow: none; }
+  .phrow { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; } .phrow img { width: min(264px, 100%); aspect-ratio: 4 / 3; height: auto; object-fit: cover; border-radius: 4px; border: 1px solid var(--line); display: block; }
+  .frow.phfrow { display: flex; flex-direction: column; align-items: stretch; gap: .5rem; } .phfrow small { font-weight: 400; }
+  #cPhPrev { width: 100%; } #cPhPrev:empty { display: none; }
+  .phitem { position: relative; display: flex; flex-direction: column; gap: .3rem; width: min(264px, 100%); cursor: grab; }
+  .phitem.drag { opacity: .4; } .phitem.over img { outline: 3px solid var(--accent, #2a6df4); outline-offset: 2px; }
+  .phmove { display: flex; align-items: center; justify-content: space-between; gap: .4rem; font-size: .85rem; }
+  .phmove button:disabled { opacity: .35; }
+  .phitem > button { position: absolute; top: -.45rem; right: -.45rem; width: 1.5rem; height: 1.5rem; padding: 0; border-radius: 50%; line-height: 1; font-weight: 700; background: #d9322b; color: #fff; border: 1px solid #8a1410; box-shadow: none; }
   .thumbbtn { position: relative; } .more { position: absolute; right: 3px; bottom: 3px; padding: 0 .3rem; border-radius: 3px; background: #000b; color: #fff; font-size: .72rem; font-weight: 700; line-height: 1.4; }
   .galnav { display: flex; align-items: center; justify-content: space-between; gap: .5rem; } .galnav .hint { font-variant-numeric: tabular-nums; }
   @media (max-width: 520px) { .rptdlg .frow { grid-template-columns: 1fr; gap: .2rem; } }
@@ -869,15 +876,28 @@ function carForm(c) {
     <label>Mileage<span class="unit"><input type="text" id="cMiles" inputmode="decimal" value="${c.mileage === "" || c.mileage == null ? "" : esc(+(c.mileage / 1000).toFixed(1))}" placeholder="95"><span>thousand miles</span></span></label>
     <label>Date added<input type="date" id="cAdded" value="${esc(c.added || todayStr())}" max="${todayStr()}"></label>
     <label>Time added<input type="time" id="cTime" value="${esc(c.addedTime || "")}"></label>
-    <div class="frow"><b>Photos</b><span class="phrow"><span class="phrow" id="cPhPrev"></span><button type="button" id="cPhPick">${iconHtml("open")}Add photos</button><input type="file" id="cPhFile" accept="image/*" multiple hidden></span></div>
-    <label>Notes<textarea id="notes" placeholder="Small dent on rear bumper">${esc(c.notes)}</textarea></label>
+    <div class="frow phfrow"><b>Photos <small class="hint">(use ◀ ▶ or drag to change the order)</small></b><span class="phrow"><span class="phrow" id="cPhPrev"></span><button type="button" id="cPhPick">${iconHtml("open")}Add photos</button><input type="file" id="cPhFile" accept="image/*" multiple hidden></span></div>
+    <label>Notes<textarea id="notes">${esc(c.notes)}</textarea></label>
     <div id="cMsg"></div>
     <div class="dlgbar">${isNew ? "" : `<button type="button" id="cDel">${iconHtml("del")}Delete car</button>`}<span class="r"><button type="button" id="cCancel">Cancel</button><button type="button" id="cSave">${iconHtml("save")}${isNew ? "Add car" : "Save changes"}</button></span></div>`, () => {
     $("cCancel").onclick = closeDlg;
     let photos = photoItems(c);
-    const showPhotos = () => { $("cPhPrev").innerHTML = photos.map((p, i) => `<span class="phitem"><img src="${esc(p.src)}" alt="Photo ${i + 1}"><button type="button" data-rm="${i}" title="Remove this photo" aria-label="Remove photo ${i + 1}">×</button></span>`).join(""); };
+    // photos can be put in order with the ◀ ▶ buttons, or dragged on a computer; the first one shows on the car's card
+    const n = () => photos.length;
+    const showPhotos = () => { $("cPhPrev").innerHTML = photos.map((p, i) => `<span class="phitem" draggable="true" data-i="${i}"><img src="${esc(p.src)}" alt="Photo ${i + 1}" draggable="false"><button type="button" data-rm="${i}" title="Remove this photo" aria-label="Remove photo ${i + 1}">×</button>${n() > 1 ? `<span class="phmove"><button type="button" data-mv="-1" data-i="${i}" ${i === 0 ? "disabled" : ""} title="Move left" aria-label="Move photo ${i + 1} left">◀</button><span class="hint">${i === 0 ? "Cover photo" : `Photo ${i + 1}`}</span><button type="button" data-mv="1" data-i="${i}" ${i === n() - 1 ? "disabled" : ""} title="Move right" aria-label="Move photo ${i + 1} right">▶</button></span>` : ""}</span>`).join(""); };
+    const movePhoto = (from, to) => { if (from === to || to < 0 || to >= n()) return; photos.splice(to, 0, photos.splice(from, 1)[0]); showPhotos(); };
     showPhotos();
-    $("cPhPrev").onclick = e => { const b = e.target.closest("[data-rm]"); if (b) { photos.splice(Number(b.dataset.rm), 1); showPhotos(); } };
+    $("cPhPrev").onclick = e => {
+      const b = e.target.closest("[data-rm]"); if (b) { photos.splice(Number(b.dataset.rm), 1); showPhotos(); return; }
+      const m = e.target.closest("[data-mv]"); if (m) { const i = Number(m.dataset.i); movePhoto(i, i + Number(m.dataset.mv)); }
+    };
+    let dragFrom = -1;
+    const item = e => e.target.closest && e.target.closest(".phitem");
+    $("cPhPrev").ondragstart = e => { const it = item(e); if (!it) return; dragFrom = Number(it.dataset.i); it.classList.add("drag"); e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(dragFrom)); };
+    $("cPhPrev").ondragover = e => { const it = item(e); if (!it || dragFrom < 0) return; e.preventDefault(); document.querySelectorAll(".phitem.over").forEach(x => x !== it && x.classList.remove("over")); it.classList.add("over"); };
+    $("cPhPrev").ondragleave = e => { const it = item(e); if (it && !it.contains(e.relatedTarget)) it.classList.remove("over"); };
+    $("cPhPrev").ondrop = e => { const it = item(e); if (!it || dragFrom < 0) return; e.preventDefault(); const f = dragFrom; dragFrom = -1; movePhoto(f, Number(it.dataset.i)); };
+    $("cPhPrev").ondragend = () => { dragFrom = -1; document.querySelectorAll(".phitem.drag, .phitem.over").forEach(x => x.classList.remove("drag", "over")); };
     $("cPhPick").onclick = () => $("cPhFile").click();
     $("cPhFile").onchange = async () => {
       const files = [...$("cPhFile").files]; $("cPhFile").value = ""; let bad = 0;
@@ -914,7 +934,7 @@ function cleanForm(x, carId) {
     <label>Time cleaned<input type="time" id="lTime" value="${esc(x.time || "")}"></label>
     <label>What was done<input type="text" id="lWork" value="${esc(x.work)}" placeholder="Wash, Interior"></label>
     <div class="quick">${QUICK.map(q => `<button type="button" data-q="${q}">+ ${q}</button>`).join("")}</div>
-    <label>Notes<textarea id="notes" placeholder="Stain on back seat didn't come out">${esc(x.notes)}</textarea></label>
+    <label>Notes<textarea id="notes">${esc(x.notes)}</textarea></label>
     <label class="ck"><input type="checkbox" id="lDone" ${!isNew && isComplete(x) ? "checked" : ""}><span><b>Car is complete</b><small>Tick this when the car is fully done. It moves to Done. Leave it unticked to keep the car on To clean.</small></span></label>
     <div id="lMsg"></div>
     <div class="dlgbar">${isNew ? "" : `<button type="button" id="lDel">${iconHtml("del")}Delete</button>`}<span class="r"><button type="button" id="lCancel">Cancel</button><button type="button" id="lSave">${iconHtml("save")}${isNew ? "Log cleaning" : "Save"}</button></span></div>`, () => {
