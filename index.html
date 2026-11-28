@@ -2,10 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://www.gstatic.com; connect-src https://*.googleapis.com; style-src 'unsafe-inline'; font-src data:; img-src data: blob:; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://www.gstatic.com; connect-src https://*.googleapis.com; style-src 'unsafe-inline'; font-src data:; img-src 'self' data: blob:; manifest-src 'self'; form-action 'none'; base-uri 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cleaning Log</title>
+<!-- home-screen icon: "Add to Home Screen" on a phone opens the log full screen like an app -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cleaning Log">
+<meta name="theme-color" content="#16202d">
 <script>let t; try { t = localStorage.getItem("lotbookTheme"); } catch (e) {} if (["classic", "win95", "mac", "retro"].includes(t)) document.documentElement.dataset.theme = t; else if (t !== "dark") document.documentElement.dataset.theme = "light";</script>
 <style>
   :root { --bg: #1b2838; --panel: #16202d; --line: #2a3a4d; --text: #c6d4df; --muted: #8f98a0; --accent: #1a9fff; --strong: #fff; }
